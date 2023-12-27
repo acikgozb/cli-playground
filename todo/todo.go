@@ -40,7 +40,6 @@ func (l *List) Complete(itemNumber int) error {
 	return nil
 }
 
-// slice ptr => original slice => underlying array
 func (l *List) Delete(itemNumber int) error {
 	if itemNumber > len(*l) || itemNumber <= 0 {
 		return fmt.Errorf("item %d does not exist", itemNumber)
@@ -73,4 +72,19 @@ func (l *List) Get(fileName string) error {
 	}
 
 	return json.Unmarshal(listJSON, l)
+}
+
+func (l *List) String() string {
+	formatted := ""
+
+	for index, item := range *l {
+		prefix := "   "
+		if item.Done {
+			prefix = "X  "
+		}
+
+		formatted += fmt.Sprintf("%s%d: %s\n", prefix, index+1, item.Task)
+	}
+
+	return formatted
 }
