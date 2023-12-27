@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-const todoFileName = "todo.json"
+var todoFileName = "todo.json"
 
 func main() {
 	taskFlag := flag.String("task", "", "Adds given task to the todo list")
@@ -23,6 +23,10 @@ func main() {
 	}
 
 	flag.Parse()
+
+	if os.Getenv("TODO_FILENAME") != "" {
+		todoFileName = os.Getenv("TODO_FILENAME")
+	}
 
 	l := &todo.List{}
 
