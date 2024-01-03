@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	binName  = "todo"
-	fileName = "todo.json"
+	binName         = "todo"
+	defaultFileName = "todo.json"
 )
 
 func TestMain(m *testing.M) {
@@ -30,6 +30,12 @@ func TestMain(m *testing.M) {
 
 	fmt.Println("Cleaning up...")
 	os.Remove(binName)
+
+	var fileName string
+	if os.Getenv("TODO_FILENAME") == "" {
+		fileName = defaultFileName
+	}
+
 	os.Remove(fileName)
 
 	os.Exit(result)
