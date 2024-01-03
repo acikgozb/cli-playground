@@ -88,3 +88,15 @@ func (l *List) String() string {
 
 	return formatted
 }
+
+func (l *List) NotCompletedTasks() *List {
+	ncList := make(List, 0)
+
+	for _, item := range *l {
+		if !item.Done {
+			ncList = append(ncList, item)
+		}
+	}
+
+	return &ncList
+}

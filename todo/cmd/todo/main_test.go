@@ -36,8 +36,9 @@ func TestMain(m *testing.M) {
 }
 
 func TestTodoCLI(t *testing.T) {
-	task1 := "test task number 1"
-	task2 := "Hello from pipe"
+	task1 := "mockAddNewTask item"
+	task2 := "mockAddNewTaskFromSTDIN item"
+	task3 := "mockShowNonCompletedTasks item"
 
 	dir, err := os.Getwd()
 	if err != nil {
@@ -122,6 +123,29 @@ func TestTodoCLI(t *testing.T) {
 
 		if tokenEndIndex == len(string(out))-1 {
 			t.Errorf("Expected }] at the end to contain in the output, but got %s", string(out))
+		}
+	})
+
+	t.Run("ShowNonCompletedTasks", func(t *testing.T) {
+		addCmd := exec.Command(cmdPath, "-add", task3)
+		if err := addCmd.Run(); err != nil {
+			t.Fatal(err)
+		}
+
+		completeCmd := exec.Command(cmdPath, "-complete", "2")
+		if err := completeCmd.Run(); err != nil {
+			t.Fatal(err)
+		}
+
+		ncCmd := exec.Command(cmdPath, "-nc")
+		out, err := ncCmd.CombinedOutput()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expected := fmt.Sprintf("   1: %s\n", task2)
+		if expected != string(out) {
+			t.Errorf("Expected to only see the not completed task, but got %s", string(out))
 		}
 	})
 }
