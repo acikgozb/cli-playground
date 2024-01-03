@@ -15,7 +15,8 @@ var todoFileName = "todo.json"
 func main() {
 	addFlag := flag.Bool("add", false, "Adds given task to the todo list")
 	listFlag := flag.Bool("list", false, "Lists all todo items that are not completed")
-	completeFlag := flag.Int("complete", 0, "Marks given itemNumber as completed")
+	completeFlag := flag.Int("complete", 0, "Marks the item with given itemNumber as completed")
+	deleteFlag := flag.Int("delete", 0, "Deletes the item with given itemNumber from the todo list")
 
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Todo tool. Developed by acikgozb.\n")
@@ -59,6 +60,16 @@ func main() {
 		}
 
 		l.Add(task)
+
+		if err := l.Save(todoFileName); err != nil {
+			_, _ = fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	case *deleteFlag > 0:
+		if err := l.Delete(*deleteFlag); err != nil {
+			_, _ = fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 
 		if err := l.Save(todoFileName); err != nil {
 			_, _ = fmt.Fprintln(os.Stderr, err)
