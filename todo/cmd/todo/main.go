@@ -27,6 +27,8 @@ func main() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Copyright 2023\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage information:\n")
 		flag.PrintDefaults()
+		fmt.Fprintf(flag.CommandLine.Output(), "To add a new task, simply enter your task with the -add option:\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "todo -add \"My new task\"\n")
 	}
 
 	flag.Parse()
