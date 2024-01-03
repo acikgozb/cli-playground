@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -102,6 +103,25 @@ func TestTodoCLI(t *testing.T) {
 		expected := fmt.Sprintf("   1: %s\n", task2)
 		if expected != string(out) {
 			t.Errorf("Expected %s from cli but got %s", expected, string(out))
+		}
+	})
+
+	t.Run("ShowListAsVerbose", func(t *testing.T) {
+		cmd := exec.Command(cmdPath, "-verbose")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tokenStartIndex := strings.Index(string(out), "[{")
+		tokenEndIndex := strings.Index(string(out), "}]")
+
+		if tokenStartIndex != 0 {
+			t.Errorf("Expected %d as starting index, but got %d", 0, tokenStartIndex)
+		}
+
+		if tokenEndIndex == len(string(out))-1 {
+			t.Errorf("Expected }] at the end to contain in the output, but got %s", string(out))
 		}
 	})
 }

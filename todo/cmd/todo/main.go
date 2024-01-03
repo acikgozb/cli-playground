@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/acikgozb/cli-playground/todo"
@@ -17,6 +18,7 @@ func main() {
 	listFlag := flag.Bool("list", false, "Lists all todo items that are not completed")
 	completeFlag := flag.Int("complete", 0, "Marks the item with given itemNumber as completed")
 	deleteFlag := flag.Int("delete", 0, "Deletes the item with given itemNumber from the todo list")
+	verboseFlag := flag.Bool("verbose", false, "Enables verbose output, shows the item in JSON format")
 
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Todo tool. Developed by acikgozb.\n")
@@ -42,6 +44,14 @@ func main() {
 	switch {
 	case *listFlag:
 		fmt.Print(l)
+	case *verboseFlag:
+		jsonOut, err := getVerboseOut(l)
+		if err != nil {
+			_, _ = fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+
+		fmt.Println(jsonOut)
 	case *completeFlag > 0:
 		if err := l.Complete(*completeFlag); err != nil {
 			_, _ = fmt.Fprintln(os.Stderr, err)
@@ -97,4 +107,13 @@ func getTask(r io.Reader, args ...string) (string, error) {
 	}
 
 	return s.Text(), nil
+}
+
+func getVerboseOut(list *todo.List) (string, error) {
+	byteOut, err := json.Marshal(list)
+	if err != nil {
+		return "", err
+	}
+
+	return string(byteOut), nil
 }
