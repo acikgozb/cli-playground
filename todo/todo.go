@@ -16,15 +16,17 @@ type item struct {
 
 type List []item
 
-func (l *List) Add(task string) {
+func (l *List) Add(tasks []string) {
 	todo := item{
-		Task:        task,
 		Done:        false,
 		CreatedAt:   time.Now(),
 		CompletedAt: time.Time{},
 	}
 
-	*l = append(*l, todo)
+	for _, task := range tasks {
+		todo.Task = task
+		*l = append(*l, todo)
+	}
 }
 
 func (l *List) Complete(itemNumber int) error {

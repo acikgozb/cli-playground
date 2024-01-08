@@ -62,8 +62,6 @@ func TestTodoCLI(t *testing.T) {
 	})
 
 	t.Run("CompleteTask", func(t *testing.T) {
-		// exec complete command for task 1,
-		// list tasks, see that X exists in output.
 		cmd := exec.Command(cmdPath, "-complete", "1")
 		if err := cmd.Run(); err != nil {
 			t.Fatal(err)

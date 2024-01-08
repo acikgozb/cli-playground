@@ -8,7 +8,6 @@ import (
 	"github.com/acikgozb/cli-playground/todo"
 	"io"
 	"os"
-	"strings"
 )
 
 var todoFileName = "todo.json"
@@ -69,13 +68,14 @@ func main() {
 			os.Exit(1)
 		}
 	case *addFlag:
-		task, err := getTask(os.Stdin, flag.Args()...)
+		tasks, err := getTasks(os.Stdin, flag.Args()...)
+		fmt.Println(tasks)
 		if err != nil {
 			_, _ = fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 
-		l.Add(task)
+		l.Add(tasks)
 
 		if err := l.Save(todoFileName); err != nil {
 			_, _ = fmt.Fprintln(os.Stderr, err)
@@ -97,22 +97,28 @@ func main() {
 	}
 }
 
-func getTask(r io.Reader, args ...string) (string, error) {
+func getTasks(r io.Reader, args ...string) ([]string, error) {
 	if len(args) > 0 {
-		return strings.Join(args, " "), nil
+		return args, nil
 	}
+
+	var tasks []string
 
 	s := bufio.NewScanner(r)
-	s.Scan()
-	if err := s.Err(); err != nil {
-		return "", err
+	for s.Scan() {
+		if err := s.Err(); err != nil {
+			return nil, err
+		}
+
+		task := s.Text()
+		if len(task) == 0 {
+			return nil, fmt.Errorf("task cannot be blank")
+		}
+
+		tasks = append(tasks, task)
 	}
 
-	if len(s.Text()) == 0 {
-		return "", fmt.Errorf("Task cannot be blank")
-	}
-
-	return s.Text(), nil
+	return tasks, nil
 }
 
 func verboseOut(list *todo.List) (string, error) {
