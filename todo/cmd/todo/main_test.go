@@ -61,6 +61,26 @@ func TestTodoCLI(t *testing.T) {
 		}
 	})
 
+	t.Run("CompleteTask", func(t *testing.T) {
+		// exec complete command for task 1,
+		// list tasks, see that X exists in output.
+		cmd := exec.Command(cmdPath, "-complete", "1")
+		if err := cmd.Run(); err != nil {
+			t.Fatal(err)
+		}
+
+		listCmd := exec.Command(cmdPath, "-list")
+		out, err := listCmd.CombinedOutput()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		completedMark := "X"
+		if !strings.Contains(string(out), completedMark) {
+			t.Errorf("Expected %s mark on task but got: %s", completedMark, string(out))
+		}
+	})
+
 	t.Run("AddNewTaskFromSTDIN", func(t *testing.T) {
 		cmd := exec.Command(cmdPath, "-add")
 		cmdStdIn, err := cmd.StdinPipe()
@@ -89,7 +109,7 @@ func TestTodoCLI(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		expected := fmt.Sprintf("   1: %s\n   2: %s\n", task1, task2)
+		expected := fmt.Sprintf("X  1: %s\n   2: %s\n", task1, task2)
 		if expected != string(out) {
 			t.Errorf("Expected %s from cli but got %s", expected, string(out))
 		}
