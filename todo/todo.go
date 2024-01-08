@@ -16,15 +16,17 @@ type item struct {
 
 type List []item
 
-func (l *List) Add(task string) {
+func (l *List) Add(tasks []string) {
 	todo := item{
-		Task:        task,
 		Done:        false,
 		CreatedAt:   time.Now(),
 		CompletedAt: time.Time{},
 	}
 
-	*l = append(*l, todo)
+	for _, task := range tasks {
+		todo.Task = task
+		*l = append(*l, todo)
+	}
 }
 
 func (l *List) Complete(itemNumber int) error {
@@ -87,4 +89,16 @@ func (l *List) String() string {
 	}
 
 	return formatted
+}
+
+func (l *List) NotCompletedTasks() *List {
+	ncList := make(List, 0)
+
+	for _, item := range *l {
+		if !item.Done {
+			ncList = append(ncList, item)
+		}
+	}
+
+	return &ncList
 }
