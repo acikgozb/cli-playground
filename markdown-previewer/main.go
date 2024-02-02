@@ -7,7 +7,9 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path/filepath"
+	"os/exec"
+	"runtime"
+	"time"
 
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/russross/blackfriday/v2"
@@ -27,6 +29,7 @@ const (
 func main() {
 	// Parse flags
 	filename := flag.String("file", "", "Markdown file to preview")
+	skipPreview := flag.Bool("s", false, "Skip auto-preview")
 	flag.Parse()
 
 	// If user did not provide input file, show usage
@@ -35,13 +38,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := run(*filename, os.Stdout); err != nil {
+	if err := run(*filename, os.Stdout, *skipPreview); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func run(fileName string, out io.Writer) error {
+func run(fileName string, out io.Writer, skipPreview bool) error {
 	// Read all the data from the input file and check for errors
 	input, err := os.ReadFile(fileName)
 	if err != nil {
@@ -61,9 +64,19 @@ func run(fileName string, out io.Writer) error {
 	}
 
 	outputName := temp.Name()
+	defer os.Remove(outputName)
+
 	fmt.Fprintln(out, outputName)
 
-	return saveHTML(outputName, htmlData)
+	if saveHTMLErr := saveHTML(outputName, htmlData); saveHTMLErr != nil {
+		return saveHTMLErr
+	}
+
+	if skipPreview {
+		return nil
+	}
+
+	return preview(outputName)
 }
 
 func saveHTML(outputName string, htmlData []byte) error {
@@ -85,4 +98,37 @@ func parseContent(input []byte) []byte {
 
 	return outputHTML.Bytes()
 }
-	resultFile = "test1.md.html"
+
+func preview(fname string) error {
+	cName := ""
+	cParams := []string{}
+
+	// Define executable based on OS
+	switch runtime.GOOS {
+	case "linux":
+		cName = "xdg-open"
+	case "windows":
+		cName = "cmd.exe"
+		cParams = []string{"/C", "start"}
+	case "darwin":
+		cName = "open"
+	default:
+		return fmt.Errorf("OS not supported")
+	}
+
+	// Append filename to parameters slice
+	cParams = append(cParams, fname)
+
+	// Locate executable in PATH
+	cPath, err := exec.LookPath(cName)
+	if err != nil {
+		return err
+	}
+
+	// Open the file using default program
+	err = exec.Command(cPath, cParams...).Run()
+
+	// Give the browser some time to open the file before deleting it (not an ideal solution)
+	time.Sleep(2 * time.Second)
+	return err
+}
