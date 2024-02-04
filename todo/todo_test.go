@@ -1,27 +1,32 @@
 package todo_test
 
 import (
-	"github.com/acikgozb/cli-playground/todo"
 	"os"
 	"testing"
+
+	"github.com/acikgozb/cli-playground/todo"
 )
 
 func TestList_Add(t *testing.T) {
 	l := todo.List{}
 
-	taskName := "New Task"
-	l.Add(taskName)
+	tasks := []string{
+		"New Task",
+	}
+	l.Add(tasks)
 
-	if l[0].Task != taskName {
-		t.Errorf("expected %s task name but got %s", taskName, l[0].Task)
+	if l[0].Task != tasks[0] {
+		t.Errorf("expected %s task name but got %s", tasks[0], l[0].Task)
 	}
 }
 
 func TestList_Complete(t *testing.T) {
 	l := todo.List{}
 
-	taskName := "New Task"
-	l.Add(taskName)
+	tasks := []string{
+		"New Task",
+	}
+	l.Add(tasks)
 
 	if l[0].Done {
 		t.Errorf("expected new task to not be completed")
@@ -47,7 +52,7 @@ func TestList_Delete(t *testing.T) {
 	}
 
 	for _, task := range tasks {
-		l.Add(task)
+		l.Add([]string{task})
 	}
 
 	err := l.Delete(2)
@@ -68,8 +73,8 @@ func TestList_Save_Get(t *testing.T) {
 	list1 := todo.List{}
 	list2 := todo.List{}
 
-	taskName := "New Task"
-	list1.Add(taskName)
+	tasks := []string{"New Task"}
+	list1.Add(tasks)
 
 	file, err := os.CreateTemp("", "test-list")
 	if err != nil {
