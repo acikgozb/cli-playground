@@ -2,6 +2,9 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -59,4 +62,106 @@ func TestRun(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRunDelExtension(t *testing.T) {
+	testCases := []struct {
+		name        string
+		cfg         config
+		extNoDelete string
+		nDelete     int
+		nNoDelete   int
+		expected    string
+	}{
+		{
+			name:        "DeleteExtensionNoMatch",
+			cfg:         config{ext: ".log", del: true},
+			extNoDelete: ".gz",
+			nDelete:     0,
+			nNoDelete:   10,
+			expected:    "",
+		},
+		{
+			name:        "DeleteExtensionMatch",
+			cfg:         config{ext: ".log", del: true},
+			extNoDelete: "",
+			nDelete:     10,
+			nNoDelete:   0,
+			expected:    "",
+		},
+		{
+			name:        "DeleteExtensionMixed",
+			cfg:         config{ext: ".log", del: true},
+			extNoDelete: ".gz",
+			nDelete:     5,
+			nNoDelete:   5,
+			expected:    "",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var buffer bytes.Buffer
+			var logBuffer bytes.Buffer
+
+			testCase.cfg.wLog = &logBuffer
+
+			tempDir, cleanup := createTempDir(t, map[string]int{
+				testCase.cfg.ext:     testCase.nDelete,
+				testCase.extNoDelete: testCase.nNoDelete,
+			})
+
+			defer cleanup()
+
+			if err := run(tempDir, &buffer, testCase.cfg); err != nil {
+				t.Fatal(err)
+			}
+
+			result := buffer.String()
+
+			if testCase.expected != result {
+				t.Errorf("Expected %q, got %q instead\n", testCase.expected, result)
+			}
+
+			filesLeft, err := os.ReadDir(tempDir)
+			if err != nil {
+				t.Error(err)
+			}
+
+			if len(filesLeft) != testCase.nNoDelete {
+				t.Errorf(
+					"Expected %d files left, but got %d instead\n",
+					testCase.nNoDelete,
+					len(filesLeft),
+				)
+			}
+
+			expectedLogLines := testCase.nDelete + 1 // +1 corresponds to the empty final line in log file.
+			lines := bytes.Split(logBuffer.Bytes(), []byte("\n"))
+			if len(lines) != expectedLogLines {
+				t.Errorf("Expected %d log lines, got %d instead", expectedLogLines, len(lines))
+			}
+		})
+	}
+}
+
+func createTempDir(t *testing.T, files map[string]int) (dirname string, cleanup func()) {
+	t.Helper()
+
+	tempDir, err := os.MkdirTemp("", "walktest")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for k, n := range files {
+		for j := 1; j <= n; j++ {
+			fileName := fmt.Sprintf("file%d%s", j, k)
+			filePath := filepath.Join(tempDir, fileName)
+			if err := os.WriteFile(filePath, []byte("dummy"), 0644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	return tempDir, func() { os.RemoveAll(tempDir) }
 }
