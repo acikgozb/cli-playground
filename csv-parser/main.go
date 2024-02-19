@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"sync"
 )
 
@@ -43,36 +44,46 @@ func run(filenames []string, op string, column int, out io.Writer) error {
 
 	consolidate := make([]float64, 0)
 
-	// Create the channel to receive results or errors of operations
+	// Create the channels to receive results or errors of operations
+	filesCh := make(chan string)
 	resCh := make(chan []float64)
 	errCh := make(chan error)
 	doneCh := make(chan struct{}) // Empty struct does not allocate any memory.
 
 	wg := sync.WaitGroup{}
 
-	for _, fname := range filenames {
-		wg.Add(1)
+	// The main goroutine, the worker queues will pick from the channel to produce output
+	go func() {
+		defer close(filesCh)
+		for _, fname := range filenames {
+			filesCh <- fname
+		}
+	}()
 
-		go func(fname string) {
+	// Create worker queues, since this CLI is CPU bound, the upper limit of goroutines is tied to the CPU number of the working environment
+	for i := 0; i < runtime.NumCPU(); i++ {
+		wg.Add(1)
+		go func() {
 			defer wg.Done()
 
-			f, err := os.Open(fname)
-			if err != nil {
-				errCh <- fmt.Errorf("cannot open file: %w", err)
+			for fname := range filesCh {
+				f, err := os.Open(fname)
+				if err != nil {
+					errCh <- fmt.Errorf("cannot open file: %w", err)
+				}
+
+				data, err := csv2float(f, column)
+				if err != nil {
+					errCh <- err
+				}
+
+				if err := f.Close(); err != nil {
+					errCh <- err
+				}
+
+				resCh <- data
 			}
-
-			data, err := csv2float(f, column)
-			if err != nil {
-				errCh <- err
-			}
-
-			if err := f.Close(); err != nil {
-				errCh <- err
-			}
-
-			resCh <- data
-		}(fname)
-
+		}()
 	}
 
 	go func() {
