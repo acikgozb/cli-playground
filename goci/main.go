@@ -7,6 +7,10 @@ import (
 	"os"
 )
 
+type executer interface {
+	execute() (string, error)
+}
+
 func main() {
 	proj := flag.String("p", "", "Project directory")
 	flag.Parse()
@@ -22,7 +26,7 @@ func run(proj string, out io.Writer) error {
 		return fmt.Errorf("project directory is required: %w", ErrValidation)
 	}
 
-	pipeline := make([]step, 2)
+	pipeline := make([]executer, 3)
 	pipeline[0] = newStep(
 		"go build",
 		"go",
@@ -31,6 +35,7 @@ func run(proj string, out io.Writer) error {
 		[]string{"build", ".", "errors"},
 	)
 	pipeline[1] = newStep("go test", "go", "Go test: SUCCESS", proj, []string{"test", "-v"})
+	pipeline[2] = newExceptionStep("go fmt", "gofmt", "gofmt: SUCCESS", proj, []string{"-l", "."})
 
 	for _, step := range pipeline {
 		msg, err := step.execute()
