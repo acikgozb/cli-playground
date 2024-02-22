@@ -2,26 +2,24 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestRun(t *testing.T) {
-	_, err := exec.LookPath("git")
-	if err != nil {
-		t.Skip("git is not installed, the test is skipped")
-	}
-
 	testCases := []struct {
 		name     string
 		proj     string
 		out      string
 		expErr   error
 		setupGit bool
+		mockCmd  func(ctx context.Context, name string, arg ...string) *exec.Cmd
 	}{
 		{
 			name:     "success",
@@ -29,6 +27,15 @@ func TestRun(t *testing.T) {
 			out:      "Go build: SUCCESS\nGo test: SUCCESS\ngofmt: SUCCESS\ngit push: SUCCESS\n",
 			expErr:   nil,
 			setupGit: true,
+			mockCmd:  nil,
+		},
+		{
+			name:     "successMock",
+			proj:     "./testdata/tool/",
+			out:      "Go build: SUCCESS\nGo test: SUCCESS\ngofmt: SUCCESS\ngit push: SUCCESS\n",
+			expErr:   nil,
+			setupGit: false,
+			mockCmd:  mockCmdContext,
 		},
 		{
 			name:     "fail",
@@ -36,6 +43,7 @@ func TestRun(t *testing.T) {
 			out:      "",
 			expErr:   &StepErr{step: "go build"},
 			setupGit: false,
+			mockCmd:  nil,
 		},
 		{
 			name:     "failFormat",
@@ -43,14 +51,33 @@ func TestRun(t *testing.T) {
 			out:      "",
 			expErr:   &StepErr{step: "go fmt"},
 			setupGit: false,
+			mockCmd:  nil,
+		},
+		{
+			name:     "failTimeout",
+			proj:     "./testdata/tool/",
+			out:      "",
+			expErr:   context.DeadlineExceeded,
+			setupGit: false,
+			mockCmd:  mockCmdTimeout,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.setupGit {
+				_, err := exec.LookPath("git")
+				if err != nil {
+					t.Skip("Git not installed, skipping test")
+				}
+
 				cleanup := setupGit(t, tc.proj)
 				defer cleanup()
+			}
+
+			// If mock command is provided, use it instead
+			if tc.mockCmd != nil {
+				command = tc.mockCmd // override the package variable used in timeoutStep
 			}
 
 			var out bytes.Buffer
@@ -58,12 +85,12 @@ func TestRun(t *testing.T) {
 
 			if tc.expErr != nil {
 				if err == nil {
-					t.Errorf("Excepted error: %q. Got nil instead", tc.expErr)
+					t.Errorf("Expected error: %q. Got nil instead", tc.expErr)
 					return
 				}
 
 				if !errors.Is(err, tc.expErr) {
-					t.Errorf("Excepted error: %q. Got %q", tc.expErr, err)
+					t.Errorf("Expected error: %q. Got %q", tc.expErr, err)
 				}
 
 				return
@@ -74,7 +101,7 @@ func TestRun(t *testing.T) {
 			}
 
 			if out.String() != tc.out {
-				t.Errorf("Excepted output: %q. Got %q instead", tc.out, out.String())
+				t.Errorf("Expected output: %q. Got %q instead", tc.out, out.String())
 			}
 		})
 	}
@@ -135,4 +162,39 @@ func setupGit(t *testing.T, proj string) func() {
 		os.RemoveAll(tempDir)
 		os.RemoveAll(filepath.Join(absProjPath, ".git"))
 	}
+}
+
+// This method is used to mock the CommandContext running inside timeoutStep.go
+func mockCmdContext(ctx context.Context, exe string, args ...string) *exec.Cmd {
+	cs := []string{"-test.run=TestHelperProcess"}
+	cs = append(cs, exe)
+	cs = append(cs, args...)
+
+	cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
+	return cmd
+}
+
+func mockCmdTimeout(ctx context.Context, exe string, args ...string) *exec.Cmd {
+	cmd := mockCmdContext(ctx, exe, args...)
+	cmd.Env = append(cmd.Env, "GO_WANT_HELPER_TIMEOUT=1")
+	return cmd
+}
+
+func TestHelperProcess(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
+		return
+	}
+
+	if os.Getenv("GO_WANT_HELPER_TIMEOUT") == "1" {
+		// Simulate a long running process
+		time.Sleep(15 * time.Second)
+	}
+
+	if os.Args[2] == "git" {
+		fmt.Fprintln(os.Stdout, "Everything up-to-date")
+		os.Exit(0)
+	}
+
+	os.Exit(1)
 }
