@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -46,17 +48,41 @@ func run(proj string, out io.Writer) error {
 		10*time.Second,
 	)
 
-	for _, step := range pipeline {
-		msg, err := step.execute()
-		if err != nil {
-			return err
-		}
+	// Create a buffered channel to capture os signal changes and act accordingly.
+	signalChannel := make(chan os.Signal, 1)
+	errCh := make(chan error)
+	done := make(chan struct{})
 
-		_, err = fmt.Fprintln(out, msg)
-		if err != nil {
+	// Pass in the interested signals to the channel
+	signal.Notify(signalChannel, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		for _, step := range pipeline {
+			msg, err := step.execute()
+			if err != nil {
+				errCh <- err
+				return
+			}
+
+			_, err = fmt.Fprintln(out, msg)
+			if err != nil {
+				errCh <- err
+				return
+			}
+		}
+		close(done)
+	}()
+
+	// Handle each output from channels accordingly.
+	for {
+		select {
+		case rec := <-signalChannel:
+			signal.Stop(signalChannel)
+			return fmt.Errorf("%s: Exiting: %w", rec, ErrSignal)
+		case err := <-errCh:
 			return err
+		case <-done:
+			return nil
 		}
 	}
-
-	return nil
 }

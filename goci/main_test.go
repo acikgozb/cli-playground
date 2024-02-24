@@ -5,9 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -161,6 +164,67 @@ func setupGit(t *testing.T, proj string) func() {
 	return func() {
 		os.RemoveAll(tempDir)
 		os.RemoveAll(filepath.Join(absProjPath, ".git"))
+	}
+}
+
+func TestRunKill(t *testing.T) {
+	testCases := []struct {
+		name   string
+		proj   string
+		sig    syscall.Signal
+		expErr error
+	}{
+		{"SIGINT", "./testdata/tool", syscall.SIGINT, ErrSignal},
+		{"SIGTERM", "./testdata/tool", syscall.SIGTERM, ErrSignal},
+		{"SIGQUIT", "./testdata/tool", syscall.SIGQUIT, nil},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			command = mockCmdContext
+
+			// Since we are testing a concurrent process, create channels accordingly to test the output.
+			errCh := make(chan error)
+			ignoredSignalCh := make(chan os.Signal, 1)
+			expectedSignalCh := make(chan os.Signal, 1)
+
+			// Attach channels to expected signals to verify them later on.
+			signal.Notify(ignoredSignalCh, syscall.SIGQUIT)
+			defer signal.Stop(ignoredSignalCh)
+
+			signal.Notify(expectedSignalCh, tc.sig)
+			defer signal.Stop(expectedSignalCh)
+
+			// Execute the process concurrently
+			go func() {
+				errCh <- run(tc.proj, io.Discard)
+			}()
+
+			// Send the signal after a brief delay.
+			go func() {
+				time.Sleep(2 * time.Millisecond)
+				syscall.Kill(syscall.Getpid(), tc.sig)
+			}()
+
+			// Select error.
+			select {
+			case err := <-errCh:
+				if !errors.Is(err, tc.expErr) {
+					t.Errorf("Expected error: %q, got %q instead", tc.expErr, err)
+				}
+			}
+
+			// Select signals
+			select {
+			case rec := <-expectedSignalCh:
+				if rec != tc.sig {
+					t.Errorf("Expected signal %q, got %q", tc.sig, rec)
+				}
+			case <-ignoredSignalCh:
+			default:
+				t.Errorf("signal not received")
+			}
+		})
 	}
 }
 

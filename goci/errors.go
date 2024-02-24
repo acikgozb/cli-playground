@@ -5,7 +5,10 @@ import (
 	"fmt"
 )
 
-var ErrValidation = errors.New("validation failed")
+var (
+	ErrValidation = errors.New("validation failed")
+	ErrSignal     = errors.New("received signal")
+)
 
 // Define a custom error to centralize the errors in each step of the CI pipeline
 type StepErr struct {
