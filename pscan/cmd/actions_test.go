@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -142,6 +144,11 @@ func TestIntegration(t *testing.T) {
 	expectedOutput += strings.Join(hostsAfterDeletion, "\n")
 	expectedOutput += fmt.Sprintln()
 
+	for _, v := range hostsAfterDeletion {
+		expectedOutput += fmt.Sprintf("%s: Host not found\n", v)
+		expectedOutput += fmt.Sprintln()
+	}
+
 	// Execute all operations in defined sequence add > list > delete > list.
 
 	// Add hosts to the list.
@@ -164,8 +171,69 @@ func TestIntegration(t *testing.T) {
 		t.Fatalf("expected no error from listAction after deletion but got %q instead", err)
 	}
 
+	if err := scanAction(&out, tempFileName, nil); err != nil {
+		t.Fatalf("expected no error but got %n instead\n", err)
+	}
+
 	// Test the output
 	if out.String() != expectedOutput {
 		t.Errorf("expected output to be %q, but got %q instead", expectedOutput, out.String())
+	}
+}
+
+func TestScanAction(t *testing.T) {
+	hosts := []string{
+		"localhost",
+		"unknownHostOutThere",
+	}
+
+	// Setup scan test
+	tf, cleanup := setup(t, hosts, true)
+	defer cleanup()
+
+	ports := []int{}
+	// Init ports, 1 open 1 closed
+	for i := 0; i < 2; i++ {
+		ln, err := net.Listen("tcp", net.JoinHostPort("localhost", "0"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		defer ln.Close()
+
+		_, portStr, err := net.SplitHostPort(ln.Addr().String())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ports = append(ports, port)
+
+		if i == 1 {
+			ln.Close()
+		}
+	}
+
+	// Define expected output for scan action.
+	expectedOutput := fmt.Sprintln("localhost:")
+
+	expectedOutput += fmt.Sprintf("\t%d: open\n", ports[0])
+	expectedOutput += fmt.Sprintf("\t%d: closed\n", ports[1])
+	expectedOutput += fmt.Sprintln()
+	expectedOutput += fmt.Sprintln("unknownHostOutThere: Host not found")
+	expectedOutput += fmt.Sprintln()
+
+	var out bytes.Buffer
+
+	if err := scanAction(&out, tf, ports); err != nil {
+		t.Fatalf("expected no error, but got %q\n", err)
+	}
+
+	if out.String() != expectedOutput {
+		t.Errorf("expected output %s but got %s instead\n", expectedOutput, out.String())
 	}
 }
