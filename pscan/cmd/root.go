@@ -18,6 +18,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -58,11 +59,22 @@ func init() {
 	// for host subcommand.
 	rootCmd.PersistentFlags().StringP("hosts-file", "f", "pScan.hosts", "pScan hosts file")
 
+	// Bind the configuration with the hosts-file flag.
+	replacer := strings.NewReplacer(
+		"-",
+		"_",
+	) // Replace - with _ for environment variable names, such as PSCAN_HOSTS_FILE
+	viper.SetEnvKeyReplacer(replacer)
+	viper.SetEnvPrefix("PSCAN")
+
+	viper.BindPFlag("hosts-file", rootCmd.PersistentFlags().Lookup("hosts-file"))
+
 	versionTemplate := `{{printf "%s: %s - version %s\n" .Name .Short .Version}}`
 	rootCmd.SetVersionTemplate(versionTemplate)
 }
 
 // initConfig reads in config file and ENV variables if set.
+// config file is defined by --config flag.
 func initConfig() {
 	if cfgFile != "" {
 		// Use config file from the flag.
@@ -74,7 +86,7 @@ func initConfig() {
 
 		// Search config in home directory with name ".cli-playground" (without extension).
 		viper.AddConfigPath(home)
-		viper.SetConfigName(".cli-playground")
+		viper.SetConfigName(".pscan")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
