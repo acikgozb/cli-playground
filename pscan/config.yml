@@ -1,0 +1,4 @@
+# Viper checks this config file and sets the values to the CLI configuration, pass this file to CLI with --config flag to set the configurations.
+# This is not mandatory, based on the configuration done in cmd/root, users can pass flags to Cobra to set the configuration as well.
+# This file is just added to explain Viper configurations in a more detail.
+hosts-file: newFile.hosts
